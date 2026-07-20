@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ArrowDownLeft,
@@ -15,7 +15,7 @@ import {
 import { useStudio } from '@/context/studio-context';
 import { MovementType } from '@/types/database';
 
-export default function StockMovementsPage() {
+function StockMovementsContent() {
   const searchParams = useSearchParams();
   const preselectedItem = searchParams.get('item');
   const actionParam = searchParams.get('action');
@@ -310,5 +310,13 @@ export default function StockMovementsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function StockMovementsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading stock movements ledger...</div>}>
+      <StockMovementsContent />
+    </Suspense>
   );
 }
