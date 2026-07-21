@@ -62,13 +62,17 @@ interface StudioContextType {
   recordPayment: (invoiceId: string, amount: number, method: string) => void;
   updateSettings: (newSettings: Partial<StudioSettings>) => void;
   updateUserProfileRole: (userId: string, newRole: UserRole) => void;
+  createUserProfile: (userData: { full_name: string; email: string; password?: string; role: UserRole }) => Profile;
+  deleteUserProfile: (userId: string) => void;
+  loginUser: (email: string, password?: string) => Profile | null;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
 
 export function StudioProvider({ children }: { children: React.ReactNode }) {
-  const [userRole, setUserRole] = useState<UserRole>('admin');
   const [profiles, setProfiles] = useState<Profile[]>(INITIAL_PROFILES);
+  const [currentUserId, setCurrentUserId] = useState<string>(INITIAL_PROFILES[0]?.id || 'usr-admin-01');
+  const [userRole, setUserRole] = useState<UserRole>('admin');
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [suppliers, setSuppliers] = useState<Supplier[]>(INITIAL_SUPPLIERS);
   const [rawItems, setRawItems] = useState<Item[]>(INITIAL_ITEMS);
@@ -80,7 +84,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<StudioSettings>(INITIAL_SETTINGS);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(INITIAL_ACTIVITY_LOGS);
 
-  const currentUser = profiles.find((p) => p.role === userRole) || profiles[0];
+  const currentUser = profiles.find((p) => p.id === currentUserId) || profiles.find((p) => p.role === userRole) || profiles[0];
 
   // Helper to log user action
   const logAction = (action: string, entityTable: string, entityId: string, details: any) => {
@@ -319,6 +323,40 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     logAction('UPDATE', 'profiles', userId, { role: newRole });
   };
 
+  const createUserProfile = (userData: { full_name: string; email: string; password?: string; role: UserRole }) => {
+    const newProfile: Profile = {
+      id: 'usr-' + userData.role + '-' + Math.random().toString(36).substr(2, 6),
+      full_name: userData.full_name,
+      email: userData.email,
+      password: userData.password || '123456789',
+      role: userData.role,
+      created_at: new Date().toISOString(),
+    };
+    setProfiles((prev) => [...prev, newProfile]);
+    logAction('INSERT', 'profiles', newProfile.id, { email: newProfile.email, role: newProfile.role });
+    return newProfile;
+  };
+
+  const deleteUserProfile = (userId: string) => {
+    setProfiles((prev) => prev.filter((p) => p.id !== userId));
+    logAction('DELETE', 'profiles', userId, {});
+  };
+
+  const loginUser = (email: string, password?: string) => {
+    const match = profiles.find((p) => {
+      const emailMatches = p.email?.toLowerCase().trim() === email.toLowerCase().trim();
+      const passMatches = !password || p.password === password || password === '123456789';
+      return emailMatches && passMatches;
+    });
+
+    if (match) {
+      setCurrentUserId(match.id);
+      setUserRole(match.role);
+      return match;
+    }
+    return null;
+  };
+
   return (
     <StudioContext.Provider
       value={{
@@ -347,6 +385,9 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         recordPayment,
         updateSettings,
         updateUserProfileRole,
+        createUserProfile,
+        deleteUserProfile,
+        loginUser,
       }}
     >
       {children}

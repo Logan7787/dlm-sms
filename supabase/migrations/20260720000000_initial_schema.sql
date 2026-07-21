@@ -1,12 +1,19 @@
 -- Migration: Initial Schema for Photo Studio Material Inventory & Invoicing System
 
--- 1. PROFILES (extends auth.users)
+-- 1. PROFILES
 create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
   full_name text,
+  email text unique,
+  password text,
   role text check (role in ('admin','manager','staff')) default 'staff',
   created_at timestamptz default now()
 );
+
+-- Ensure profiles table has email/password columns and drop auth.users FK constraint if present from earlier schema runs
+alter table public.profiles add column if not exists email text;
+alter table public.profiles add column if not exists password text;
+alter table public.profiles drop constraint if exists profiles_id_fkey;
 
 -- 2. CATEGORIES
 create table if not exists public.categories (
@@ -440,99 +447,127 @@ as $$
 $$;
 
 -- PROFILES Policies
+drop policy if exists "Profiles visible to authenticated users" on public.profiles;
 create policy "Profiles visible to authenticated users" on public.profiles
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "Admins can manage profiles" on public.profiles;
 create policy "Admins can manage profiles" on public.profiles
   for all using (public.current_user_role() = 'admin');
 
+drop policy if exists "Users can update own profile name" on public.profiles;
 create policy "Users can update own profile name" on public.profiles
   for update using (id = auth.uid());
 
 -- CATEGORIES Policies
+drop policy if exists "Categories visible to authenticated" on public.categories;
 create policy "Categories visible to authenticated" on public.categories
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "Admins and Managers can manage categories" on public.categories;
 create policy "Admins and Managers can manage categories" on public.categories
   for all using (public.current_user_role() in ('admin', 'manager'));
 
 -- SUPPLIERS Policies
+drop policy if exists "Suppliers visible to authenticated" on public.suppliers;
 create policy "Suppliers visible to authenticated" on public.suppliers
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "All authenticated can create/edit suppliers" on public.suppliers;
 create policy "All authenticated can create/edit suppliers" on public.suppliers
   for all using (auth.role() = 'authenticated');
 
 -- ITEMS Policies
+drop policy if exists "Items visible to authenticated" on public.items;
 create policy "Items visible to authenticated" on public.items
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "Admins and Managers can manage items" on public.items;
 create policy "Admins and Managers can manage items" on public.items
   for all using (public.current_user_role() in ('admin', 'manager'));
 
+drop policy if exists "Staff can insert items" on public.items;
 create policy "Staff can insert items" on public.items
   for insert with check (auth.role() = 'authenticated');
 
 -- STOCK MOVEMENTS Policies
+drop policy if exists "Stock movements visible to authenticated" on public.stock_movements;
 create policy "Stock movements visible to authenticated" on public.stock_movements
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "Authenticated users can insert stock movements" on public.stock_movements;
 create policy "Authenticated users can insert stock movements" on public.stock_movements
   for insert with check (auth.role() = 'authenticated');
 
+drop policy if exists "Admins and Managers can manage stock movements" on public.stock_movements;
 create policy "Admins and Managers can manage stock movements" on public.stock_movements
   for update using (public.current_user_role() in ('admin', 'manager'));
 
 -- CUSTOMERS Policies
+drop policy if exists "Customers visible to authenticated" on public.customers;
 create policy "Customers visible to authenticated" on public.customers
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "All authenticated can create/edit customers" on public.customers;
 create policy "All authenticated can create/edit customers" on public.customers
   for all using (auth.role() = 'authenticated');
 
 -- INVOICES Policies
+drop policy if exists "Invoices visible to authenticated" on public.invoices;
 create policy "Invoices visible to authenticated" on public.invoices
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "Authenticated users can create invoices" on public.invoices;
 create policy "Authenticated users can create invoices" on public.invoices
   for insert with check (auth.role() = 'authenticated');
 
+drop policy if exists "Authenticated users can update draft invoices" on public.invoices;
 create policy "Authenticated users can update draft invoices" on public.invoices
   for update using (
     public.current_user_role() in ('admin', 'manager') or status = 'draft'
   );
 
+drop policy if exists "Admins and Managers can delete invoices" on public.invoices;
 create policy "Admins and Managers can delete invoices" on public.invoices
   for delete using (public.current_user_role() in ('admin', 'manager'));
 
 -- INVOICE ITEMS Policies
+drop policy if exists "Invoice items visible to authenticated" on public.invoice_items;
 create policy "Invoice items visible to authenticated" on public.invoice_items
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "All authenticated can insert invoice items" on public.invoice_items;
 create policy "All authenticated can insert invoice items" on public.invoice_items
   for insert with check (auth.role() = 'authenticated');
 
+drop policy if exists "All authenticated can update invoice items" on public.invoice_items;
 create policy "All authenticated can update invoice items" on public.invoice_items
   for update using (auth.role() = 'authenticated');
 
+drop policy if exists "All authenticated can delete invoice items" on public.invoice_items;
 create policy "All authenticated can delete invoice items" on public.invoice_items
   for delete using (auth.role() = 'authenticated');
 
 -- PAYMENTS Policies
+drop policy if exists "Payments visible to authenticated" on public.payments;
 create policy "Payments visible to authenticated" on public.payments
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "All authenticated can record payments" on public.payments;
 create policy "All authenticated can record payments" on public.payments
   for insert with check (auth.role() = 'authenticated');
 
 -- ACTIVITY LOG Policies
+drop policy if exists "Activity log visible to authenticated" on public.activity_log;
 create policy "Activity log visible to authenticated" on public.activity_log
   for select using (auth.role() = 'authenticated');
 
 -- STUDIO SETTINGS Policies
+drop policy if exists "Settings visible to authenticated" on public.studio_settings;
 create policy "Settings visible to authenticated" on public.studio_settings
   for select using (auth.role() = 'authenticated');
 
+drop policy if exists "Admins can update studio settings" on public.studio_settings;
 create policy "Admins can update studio settings" on public.studio_settings
   for update using (public.current_user_role() = 'admin');
 
@@ -549,14 +584,18 @@ values ('invoices', 'invoices', false)
 on conflict (id) do nothing;
 
 -- Storage Policies
+drop policy if exists "Item photos public access" on storage.objects;
 create policy "Item photos public access" on storage.objects
   for select using (bucket_id = 'item-photos');
 
+drop policy if exists "Item photos auth upload" on storage.objects;
 create policy "Item photos auth upload" on storage.objects
   for insert with check (bucket_id = 'item-photos' and auth.role() = 'authenticated');
 
+drop policy if exists "Invoices auth access" on storage.objects;
 create policy "Invoices auth access" on storage.objects
   for select using (bucket_id = 'invoices' and auth.role() = 'authenticated');
 
+drop policy if exists "Invoices auth upload" on storage.objects;
 create policy "Invoices auth upload" on storage.objects
   for insert with check (bucket_id = 'invoices' and auth.role() = 'authenticated');
