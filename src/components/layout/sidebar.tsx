@@ -40,7 +40,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-64 bg-slate-900/90 border-r border-slate-800/80 flex flex-col justify-between h-screen sticky top-0 z-40 backdrop-blur-md">
+    <aside className="w-64 bg-slate-900/90 border-r border-slate-800/80 flex flex-col justify-between h-screen sticky top-0 z-40 backdrop-blur-md print:hidden">
       <div>
         {/* Brand Logo Header */}
         <div className="p-6 border-b border-slate-800/80 flex items-center gap-3">
