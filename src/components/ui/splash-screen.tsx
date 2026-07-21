@@ -1,149 +1,163 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
-import { Sparkles, ArrowRight } from 'lucide-react';
 
 interface SplashScreenProps {
   onComplete: () => void;
   minDurationMs?: number;
 }
 
-export function SplashScreen({ onComplete, minDurationMs = 2400 }: SplashScreenProps) {
-  const [progress, setProgress] = useState(0);
-  const [statusText, setStatusText] = useState('Initializing Studio System...');
+export function SplashScreen({ onComplete, minDurationMs = 2800 }: SplashScreenProps) {
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
-    const startTime = Date.now();
-    const intervalTime = 30; // update interval ms
-    const totalSteps = minDurationMs / intervalTime;
-    let step = 0;
+    const timer = setTimeout(() => {
+      setIsFadingOut(true);
+      setTimeout(() => {
+        onComplete();
+      }, 500);
+    }, minDurationMs);
 
-    const timer = setInterval(() => {
-      step++;
-      const currentProgress = Math.min(Math.round((step / totalSteps) * 100), 100);
-      setProgress(currentProgress);
-
-      if (currentProgress < 30) {
-        setStatusText('Initializing Studio System...');
-      } else if (currentProgress < 65) {
-        setStatusText('Loading Material Inventory & Ledgers...');
-      } else if (currentProgress < 90) {
-        setStatusText('Configuring Invoicing Modules...');
-      } else {
-        setStatusText('Welcome to Daylight Media');
-      }
-
-      if (currentProgress >= 100) {
-        clearInterval(timer);
-        // Start smooth fade out transition
-        setTimeout(() => {
-          setIsFadingOut(true);
-          setTimeout(() => {
-            onComplete();
-          }, 600); // match transition duration
-        }, 200);
-      }
-    }, intervalTime);
-
-    return () => clearInterval(timer);
+    return () => clearTimeout(timer);
   }, [minDurationMs, onComplete]);
 
   const handleSkip = () => {
     setIsFadingOut(true);
     setTimeout(() => {
       onComplete();
-    }, 400);
+    }, 300);
   };
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 text-slate-100 transition-all duration-700 ease-in-out ${
-        isFadingOut ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
+      onClick={handleSkip}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black cursor-pointer select-none transition-opacity duration-500 ease-in-out ${
+        isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      {/* Background Radial Light Orbs */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[400px] bg-purple-600/15 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute top-1/4 right-1/4 w-[350px] h-[350px] bg-pink-600/15 rounded-full blur-[100px] pointer-events-none" />
+      <style>{`
+        .splash-container {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          background: #000;
+          font-family: 'Segoe UI', Arial, sans-serif;
+        }
 
-      {/* Floating Sparkle Particles */}
-      <div className="absolute top-1/4 left-1/4 w-3 h-3 rounded-full bg-indigo-400/40 blur-[1px] animate-float-1 pointer-events-none" />
-      <div className="absolute bottom-1/3 right-1/3 w-4 h-4 rounded-full bg-purple-400/30 blur-[1px] animate-float-2 pointer-events-none" />
-      <div className="absolute top-2/3 right-1/4 w-2 h-2 rounded-full bg-pink-400/40 blur-[1px] animate-float-3 pointer-events-none" />
+        .glow-bg {
+          position: absolute;
+          width: 600px;
+          height: 600px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(255,153,0,0.25) 0%, rgba(255,153,0,0) 70%);
+          animation: pulseGlow 2.5s ease-in-out infinite;
+        }
 
-      {/* Grid Pattern Overlay for Tech Feel */}
-      <div 
-        className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px]"
-      />
+        @keyframes pulseGlow {
+          0%, 100% { transform: scale(0.9); opacity: 0.6; }
+          50% { transform: scale(1.15); opacity: 1; }
+        }
 
-      <div className="relative z-10 flex flex-col items-center max-w-sm w-full px-6 text-center animate-logo-in">
-        
-        {/* Animated Outer Glowing Aura Ring */}
-        <div className="relative mb-8 group">
-          {/* Rotating Gradient Ring */}
-          <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-60 blur-xl animate-spin-slow" />
-          
-          {/* Pulsing Backlight */}
-          <div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-indigo-600 to-purple-600 opacity-80 animate-pulse-glow" />
+        .logo-wrap {
+          position: relative;
+          opacity: 0;
+          transform: scale(0.4) rotate(-8deg);
+          animation: logoIn 1.1s cubic-bezier(.34,1.56,.64,1) forwards;
+        }
 
-          {/* Logo Frame Glass Container */}
-          <div className="relative w-36 h-36 md:w-40 md:h-40 rounded-3xl bg-slate-900/90 border border-slate-700/60 p-4 shadow-2xl backdrop-blur-2xl flex items-center justify-center overflow-hidden">
-            <Image
-              src="/logo.png"
-              alt="Daylight Media Logo"
-              width={140}
-              height={140}
-              priority
-              className="object-contain w-full h-full drop-shadow-[0_10px_20px_rgba(99,102,241,0.5)] transform transition-transform duration-500 hover:scale-105"
-            />
-          </div>
+        @keyframes logoIn {
+          0% { opacity: 0; transform: scale(0.4) rotate(-8deg); }
+          60% { opacity: 1; transform: scale(1.08) rotate(2deg); }
+          80% { transform: scale(0.97) rotate(-1deg); }
+          100% { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+
+        .logo-img {
+          width: 340px;
+          max-width: 80vw;
+          display: block;
+          position: relative;
+          z-index: 2;
+          filter: drop-shadow(0 0 18px rgba(255,153,0,0.35));
+        }
+
+        .shine {
+          position: absolute;
+          top: 0;
+          left: -150%;
+          width: 60%;
+          height: 100%;
+          background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 100%);
+          transform: skewX(-20deg);
+          z-index: 3;
+          animation: shineSweep 2.6s ease-in-out 1.1s infinite;
+          pointer-events: none;
+        }
+
+        @keyframes shineSweep {
+          0% { left: -150%; }
+          35% { left: 150%; }
+          100% { left: 150%; }
+        }
+
+        .loader {
+          margin-top: 44px;
+          display: flex;
+          gap: 10px;
+          opacity: 0;
+          animation: fadeUp .6s ease-out 1.0s forwards;
+        }
+
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #FF9900;
+          animation: dotBounce 1s ease-in-out infinite;
+        }
+
+        .dot:nth-child(2) { animation-delay: .15s; }
+        .dot:nth-child(3) { animation-delay: .3s; }
+
+        @keyframes dotBounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: .4; }
+          40% { transform: translateY(-10px); opacity: 1; }
+        }
+
+        .tagline {
+          margin-top: 18px;
+          color: #888;
+          font-size: 13px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          opacity: 0;
+          animation: fadeUp .6s ease-out 1.3s forwards;
+        }
+      `}</style>
+
+      <div className="splash-container">
+        <div className="glow-bg"></div>
+        <div className="logo-wrap">
+          <img className="logo-img" src="/logo.png" alt="Daylight Media Logo" />
+          <div className="shine"></div>
         </div>
-
-        {/* Title & Tagline */}
-        <div className="space-y-2 mb-8">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold tracking-wide uppercase mb-1">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-            <span>Studio Management Platform</span>
-          </div>
-          
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent drop-shadow-sm">
-            Daylight Media
-          </h1>
-          
-          <p className="text-sm text-slate-400 font-medium max-w-xs">
-            Stock, Inventory & Invoicing System
-          </p>
+        <div className="loader">
+          <div className="dot"></div>
+          <div className="dot"></div>
+          <div className="dot"></div>
         </div>
-
-        {/* Shimmer Progress Bar Container */}
-        <div className="w-full space-y-3">
-          <div className="relative w-full h-2 rounded-full bg-slate-900 border border-slate-800/80 overflow-hidden shadow-inner">
-            <div
-              className="h-full rounded-full animate-shimmer transition-all duration-150 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
-              {statusText}
-            </span>
-            <span className="font-bold text-indigo-300">{progress}%</span>
-          </div>
-        </div>
+        <div className="tagline">Stock &amp; Inventory Management System</div>
       </div>
-
-      {/* Skip Button */}
-      <button
-        onClick={handleSkip}
-        className="absolute bottom-8 text-xs font-medium text-slate-500 hover:text-slate-200 transition-colors flex items-center gap-1 py-1.5 px-3 rounded-lg hover:bg-slate-900/60"
-      >
-        <span>Skip intro</span>
-        <ArrowRight className="w-3.5 h-3.5" />
-      </button>
     </div>
   );
 }

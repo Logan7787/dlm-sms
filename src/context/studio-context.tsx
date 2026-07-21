@@ -15,6 +15,7 @@ import {
   StudioSettings,
   Supplier,
   UserRole,
+  InvoiceStatus,
 } from '@/types/database';
 import {
   calculateStockOnHand,
@@ -30,6 +31,17 @@ import {
   INITIAL_STOCK_MOVEMENTS,
   INITIAL_SUPPLIERS,
 } from '@/lib/store';
+import { createClient } from '@/lib/supabase/client';
+
+function generateUUID(prefixChar = 'a') {
+  const char = '0123456789abcdef'.includes(prefixChar.toLowerCase()) ? prefixChar.toLowerCase() : 'a';
+  const hex32 = (char + Math.random().toString(16).substr(2, 31)).padEnd(32, '0').slice(0, 32);
+  return `${hex32.slice(0, 8)}-${hex32.slice(8, 12)}-${hex32.slice(12, 16)}-${hex32.slice(16, 20)}-${hex32.slice(20, 32)}`;
+}
+
+function isValidUUID(id?: string | null) {
+  return !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+}
 
 interface StudioContextType {
   userRole: UserRole;
@@ -74,6 +86,8 @@ interface StudioContextType {
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
 
 export function StudioProvider({ children }: { children: React.ReactNode }) {
+  const supabase = createClient();
+
   const [profiles, setProfiles] = useState<Profile[]>(INITIAL_PROFILES);
   const [currentUserId, setCurrentUserId] = useState<string>(INITIAL_PROFILES[0]?.id || 'usr-admin-01');
   const [userRole, setUserRole] = useState<UserRole>('admin');
@@ -87,6 +101,50 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>(INITIAL_PAYMENTS);
   const [settings, setSettings] = useState<StudioSettings>(INITIAL_SETTINGS);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(INITIAL_ACTIVITY_LOGS);
+
+  // Sync initial data from Supabase Database if populated
+  useEffect(() => {
+    async function loadSupabaseData() {
+      try {
+        const { data: fetchedProfiles } = await (supabase as any).from('profiles').select('*');
+        if (fetchedProfiles && fetchedProfiles.length > 0) setProfiles(fetchedProfiles as Profile[]);
+
+        const { data: fetchedCategories } = await (supabase as any).from('categories').select('*');
+        if (fetchedCategories && fetchedCategories.length > 0) setCategories(fetchedCategories as Category[]);
+
+        const { data: fetchedSuppliers } = await (supabase as any).from('suppliers').select('*');
+        if (fetchedSuppliers && fetchedSuppliers.length > 0) {
+          const mapped = fetchedSuppliers.map((s: any) => ({
+            ...s,
+            phone: s.phone || s.contact_phone || null,
+            email: s.email || s.contact_email || null,
+          }));
+          setSuppliers(mapped as Supplier[]);
+        }
+
+        const { data: fetchedItems } = await (supabase as any).from('items').select('*');
+        if (fetchedItems && fetchedItems.length > 0) setRawItems(fetchedItems as Item[]);
+
+        const { data: fetchedMovements } = await (supabase as any).from('stock_movements').select('*');
+        if (fetchedMovements && fetchedMovements.length > 0) setStockMovements(fetchedMovements as StockMovement[]);
+
+        const { data: fetchedCustomers } = await (supabase as any).from('customers').select('*');
+        if (fetchedCustomers && fetchedCustomers.length > 0) setCustomers(fetchedCustomers as Customer[]);
+
+        const { data: fetchedInvoices } = await (supabase as any).from('invoices').select('*');
+        if (fetchedInvoices && fetchedInvoices.length > 0) setInvoices(fetchedInvoices as Invoice[]);
+
+        const { data: fetchedInvoiceItems } = await (supabase as any).from('invoice_items').select('*');
+        if (fetchedInvoiceItems && fetchedInvoiceItems.length > 0) setInvoiceItems(fetchedInvoiceItems as InvoiceItem[]);
+
+        const { data: fetchedPayments } = await (supabase as any).from('payments').select('*');
+        if (fetchedPayments && fetchedPayments.length > 0) setPayments(fetchedPayments as Payment[]);
+      } catch (err) {
+        console.warn('Supabase initial fetch warning (using fallback store):', err);
+      }
+    }
+    loadSupabaseData();
+  }, []);
 
   const currentUser = profiles.find((p) => p.id === currentUserId) || profiles.find((p) => p.role === userRole) || profiles[0];
 
@@ -119,7 +177,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   });
 
   const addItem: StudioContextType['addItem'] = (itemData, initialQuantity = 0) => {
-    const id = 'i-' + Math.random().toString(36).substr(2, 9);
+    const id = generateUUID('b');
     const newItem: Item = {
       ...itemData,
       id,
@@ -127,105 +185,172 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     };
     setRawItems((prev) => [newItem, ...prev]);
 
+    let initialMovement: StockMovement | null = null;
     if (initialQuantity > 0) {
-      const initialMovement: StockMovement = {
-        id: 'm-' + Math.random().toString(36).substr(2, 9),
+      initialMovement = {
+        id: generateUUID('c'),
         item_id: id,
         movement_type: 'purchase_in',
         quantity: initialQuantity,
         reference_invoice_id: null,
         note: 'Initial stock on item creation',
-        created_by: currentUser.id,
+        created_by: currentUser.id.includes('-') && currentUser.id.length >= 30 ? currentUser.id : null,
         created_at: new Date().toISOString(),
       };
-      setStockMovements((prev) => [initialMovement, ...prev]);
+      setStockMovements((prev) => [initialMovement!, ...prev]);
     }
 
     logAction('INSERT', 'items', id, { name: newItem.name, sku: newItem.sku });
+
+    (supabase as any).from('items').insert([newItem]).then(({ error }: any) => {
+      if (error) console.error('Supabase item insert error:', error);
+    });
+    if (initialMovement) {
+      (supabase as any).from('stock_movements').insert([initialMovement]).then(({ error }: any) => {
+        if (error) console.error('Supabase stock movement insert error:', error);
+      });
+    }
   };
 
   const updateItem: StudioContextType['updateItem'] = (id, itemData) => {
     setRawItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...itemData } : item)));
     logAction('UPDATE', 'items', id, itemData);
+
+    (supabase as any).from('items').update(itemData).eq('id', id).then(({ error }: any) => {
+      if (error) console.error('Supabase item update error:', error);
+    });
   };
 
   const addStockMovement: StudioContextType['addStockMovement'] = (movementData) => {
     const newMovement: StockMovement = {
-      id: 'm-' + Math.random().toString(36).substr(2, 9),
+      id: generateUUID('c'),
       item_id: movementData.item_id,
       movement_type: movementData.movement_type,
       quantity: movementData.quantity,
       reference_invoice_id: movementData.reference_invoice_id || null,
       note: movementData.note || '',
-      created_by: currentUser.id,
+      created_by: currentUser.id.includes('-') && currentUser.id.length >= 30 ? currentUser.id : null,
       created_at: new Date().toISOString(),
     };
     setStockMovements((prev) => [newMovement, ...prev]);
     logAction('INSERT', 'stock_movements', newMovement.id, movementData);
+
+    (supabase as any).from('stock_movements').insert([newMovement]).then(({ error }: any) => {
+      if (error) console.error('Supabase stock movement insert error:', error);
+    });
   };
 
   const addCategory: StudioContextType['addCategory'] = (name, description) => {
     const newCat: Category = {
-      id: 'c-' + Math.random().toString(36).substr(2, 9),
+      id: generateUUID('c'),
       name,
       description: description || null,
       created_at: new Date().toISOString(),
     };
     setCategories((prev) => [...prev, newCat]);
     logAction('INSERT', 'categories', newCat.id, { name });
+
+    (supabase as any).from('categories').insert([newCat]).then(({ error }: any) => {
+      if (error) console.error('Supabase category insert error:', error);
+    });
   };
 
   const addSupplier: StudioContextType['addSupplier'] = (supplierData) => {
+    const id = generateUUID('a');
     const newSup: Supplier = {
       ...supplierData,
-      id: 's-' + Math.random().toString(36).substr(2, 9),
+      id,
       created_at: new Date().toISOString(),
     };
     setSuppliers((prev) => [...prev, newSup]);
     logAction('INSERT', 'suppliers', newSup.id, { name: newSup.name });
+
+    const dbPayload = {
+      id: newSup.id,
+      name: newSup.name,
+      contact_phone: (newSup as any).phone || (newSup as any).contact_phone || null,
+      contact_email: (newSup as any).email || (newSup as any).contact_email || null,
+      address: newSup.address || null,
+      created_at: newSup.created_at,
+    };
+
+    (supabase as any).from('suppliers').insert([dbPayload]).then(({ error }: any) => {
+      if (error) console.error('Supabase supplier insert error:', error);
+    });
   };
 
   const updateSupplier: StudioContextType['updateSupplier'] = (id, supplierData) => {
     setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...supplierData } : s)));
     logAction('UPDATE', 'suppliers', id, supplierData);
+
+    const dbPayload: any = { ...supplierData };
+    if ('phone' in supplierData) {
+      dbPayload.contact_phone = supplierData.phone;
+      delete dbPayload.phone;
+    }
+    if ('email' in supplierData) {
+      dbPayload.contact_email = supplierData.email;
+      delete dbPayload.email;
+    }
+
+    (supabase as any).from('suppliers').update(dbPayload).eq('id', id).then(({ error }: any) => {
+      if (error) console.error('Supabase supplier update error:', error);
+    });
   };
 
   const deleteSupplier: StudioContextType['deleteSupplier'] = (id) => {
     setSuppliers((prev) => prev.filter((s) => s.id !== id));
     logAction('DELETE', 'suppliers', id, {});
+
+    (supabase as any).from('suppliers').delete().eq('id', id).then(({ error }: any) => {
+      if (error) console.error('Supabase supplier delete error:', error);
+    });
   };
 
   const addCustomer: StudioContextType['addCustomer'] = (customerData) => {
+    const id = generateUUID('d');
     const newCust: Customer = {
       ...customerData,
-      id: 'u-' + Math.random().toString(36).substr(2, 9),
+      id,
       created_at: new Date().toISOString(),
     };
     setCustomers((prev) => [...prev, newCust]);
     logAction('INSERT', 'customers', newCust.id, { name: newCust.name });
+
+    (supabase as any).from('customers').insert([newCust]).then(({ error }: any) => {
+      if (error) console.error('Supabase customer insert error:', error);
+    });
   };
 
   const updateCustomer: StudioContextType['updateCustomer'] = (id, customerData) => {
     setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...customerData } : c)));
     logAction('UPDATE', 'customers', id, customerData);
+
+    (supabase as any).from('customers').update(customerData).eq('id', id).then(({ error }: any) => {
+      if (error) console.error('Supabase customer update error:', error);
+    });
   };
 
   const deleteCustomer: StudioContextType['deleteCustomer'] = (id) => {
     setCustomers((prev) => prev.filter((c) => c.id !== id));
     logAction('DELETE', 'customers', id, {});
+
+    (supabase as any).from('customers').delete().eq('id', id).then(({ error }: any) => {
+      if (error) console.error('Supabase customer delete error:', error);
+    });
   };
 
   const createInvoice: StudioContextType['createInvoice'] = (invoiceData, lineItemsData) => {
-    const invoiceId = 'v-' + Math.random().toString(36).substr(2, 9);
+    const invoiceId = generateUUID('e');
     
     let subtotal = 0;
     const createdItems: InvoiceItem[] = lineItemsData.map((item) => {
       const lineTotal = item.quantity * item.unit_price;
       subtotal += lineTotal;
       return {
-        id: 'ii-' + Math.random().toString(36).substr(2, 9),
+        id: generateUUID('b'),
         invoice_id: invoiceId,
-        item_id: item.item_id || null,
+        item_id: (isValidUUID(item.item_id) ? item.item_id! : null) as string | null,
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unit_price,
@@ -240,7 +365,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     const newInvoice: Invoice = {
       id: invoiceId,
       invoice_number: invoiceData.invoice_number,
-      customer_id: invoiceData.customer_id || null,
+      customer_id: (isValidUUID(invoiceData.customer_id) ? invoiceData.customer_id! : null) as string | null,
       status: 'draft',
       subtotal,
       tax_percent: taxPercent,
@@ -250,7 +375,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       pdf_url: invoiceData.pdf_url || null,
       issued_at: invoiceData.issued_at || new Date().toISOString().split('T')[0],
       due_at: invoiceData.due_at || null,
-      created_by: invoiceData.created_by || currentUser.id,
+      created_by: (isValidUUID(invoiceData.created_by) ? invoiceData.created_by! : (isValidUUID(currentUser.id) ? currentUser.id : null)) as string | null,
       created_at: new Date().toISOString(),
     };
 
@@ -258,6 +383,17 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     setInvoiceItems((prev) => [...prev, ...createdItems]);
 
     logAction('INSERT', 'invoices', invoiceId, { invoice_number: newInvoice.invoice_number, total });
+
+    (supabase as any).from('invoices').insert([newInvoice]).then(({ error }: any) => {
+      if (error) console.error('Supabase invoice insert error:', error);
+    });
+
+    // Omit line_total generated column for Supabase insert
+    const dbInvoiceItemsPayload = createdItems.map(({ line_total, ...item }) => item);
+    (supabase as any).from('invoice_items').insert(dbInvoiceItemsPayload).then(({ error }: any) => {
+      if (error) console.error('Supabase invoice_items insert error:', error);
+    });
+
     return newInvoice;
   };
 
@@ -282,31 +418,40 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
 
     // 2. Deduct inventory via usage_out stock movements
     const newMovements: StockMovement[] = linkedItems.map((line) => ({
-      id: 'm-' + Math.random().toString(36).substr(2, 9),
+      id: generateUUID('c'),
       item_id: line.item_id!,
       movement_type: 'usage_out',
       quantity: line.quantity,
       reference_invoice_id: invoiceId,
       note: `Stock deducted on finalization of invoice #${invoice.invoice_number}`,
-      created_by: currentUser.id,
+      created_by: currentUser.id.includes('-') && currentUser.id.length >= 30 ? currentUser.id : null,
       created_at: new Date().toISOString(),
     }));
 
     setStockMovements((prev) => [...newMovements, ...prev]);
 
     // 3. Update invoice status
-    const newStatus = invoice.amount_paid >= invoice.total && invoice.total > 0 ? 'paid' : 'sent';
+    const newStatus: InvoiceStatus = invoice.amount_paid >= invoice.total && invoice.total > 0 ? 'paid' : 'sent';
     setInvoices((prev) =>
       prev.map((inv) => (inv.id === invoiceId ? { ...inv, status: newStatus } : inv))
     );
 
     logAction('FINALIZE', 'invoices', invoiceId, { invoice_number: invoice.invoice_number });
+
+    (supabase as any).from('stock_movements').insert(newMovements).then(({ error }: any) => {
+      if (error) console.error('Supabase stock movements insert error:', error);
+    });
+    (supabase as any).from('invoices').update({ status: newStatus }).eq('id', invoiceId).then(({ error }: any) => {
+      if (error) console.error('Supabase invoice status update error:', error);
+    });
+
     return { success: true };
   };
 
   const recordPayment: StudioContextType['recordPayment'] = (invoiceId, amount, method) => {
+    const paymentId = generateUUID('c');
     const payment: Payment = {
-      id: 'pay-' + Math.random().toString(36).substr(2, 9),
+      id: paymentId,
       invoice_id: invoiceId,
       amount,
       method,
@@ -315,12 +460,14 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
 
     setPayments((prev) => [payment, ...prev]);
 
-    // Update invoice total paid & status
+    let newAmountPaid = 0;
+    let newStatus: InvoiceStatus = 'draft';
+
     setInvoices((prev) =>
       prev.map((inv) => {
         if (inv.id !== invoiceId) return inv;
-        const newAmountPaid = inv.amount_paid + amount;
-        let newStatus = inv.status;
+        newAmountPaid = inv.amount_paid + amount;
+        newStatus = inv.status;
         if (newAmountPaid >= inv.total && inv.total > 0) {
           newStatus = 'paid';
         } else if (newAmountPaid > 0 && inv.status !== 'draft') {
@@ -335,21 +482,37 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     );
 
     logAction('INSERT', 'payments', payment.id, { invoice_id: invoiceId, amount, method });
+
+    (supabase as any).from('payments').insert([payment]).then(({ error }: any) => {
+      if (error) console.error('Supabase payment insert error:', error);
+    });
+    (supabase as any).from('invoices').update({ amount_paid: newAmountPaid, status: newStatus }).eq('id', invoiceId).then(({ error }: any) => {
+      if (error) console.error('Supabase invoice payment status update error:', error);
+    });
   };
 
   const updateSettings: StudioContextType['updateSettings'] = (newSettings) => {
     setSettings((prev) => ({ ...prev, ...newSettings, updated_at: new Date().toISOString() }));
     logAction('UPDATE', 'studio_settings', '1', newSettings);
+
+    (supabase as any).from('studio_settings').update(newSettings).eq('id', '1').then(({ error }: any) => {
+      if (error) console.error('Supabase studio_settings update error:', error);
+    });
   };
 
   const updateUserProfileRole = (userId: string, newRole: UserRole) => {
     setProfiles((prev) => prev.map((p) => (p.id === userId ? { ...p, role: newRole } : p)));
     logAction('UPDATE', 'profiles', userId, { role: newRole });
+
+    (supabase as any).from('profiles').update({ role: newRole }).eq('id', userId).then(({ error }: any) => {
+      if (error) console.error('Supabase profile update error:', error);
+    });
   };
 
   const createUserProfile = (userData: { full_name: string; email: string; password?: string; role: UserRole }) => {
+    const id = generateUUID('f');
     const newProfile: Profile = {
-      id: 'usr-' + userData.role + '-' + Math.random().toString(36).substr(2, 6),
+      id,
       full_name: userData.full_name,
       email: userData.email,
       password: userData.password || '123456789',
@@ -358,12 +521,20 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     };
     setProfiles((prev) => [...prev, newProfile]);
     logAction('INSERT', 'profiles', newProfile.id, { email: newProfile.email, role: newProfile.role });
+
+    (supabase as any).from('profiles').insert([newProfile]).then(({ error }: any) => {
+      if (error) console.error('Supabase profile insert error:', error);
+    });
     return newProfile;
   };
 
   const deleteUserProfile = (userId: string) => {
     setProfiles((prev) => prev.filter((p) => p.id !== userId));
     logAction('DELETE', 'profiles', userId, {});
+
+    (supabase as any).from('profiles').delete().eq('id', userId).then(({ error }: any) => {
+      if (error) console.error('Supabase profile delete error:', error);
+    });
   };
 
   const loginUser = (email: string, password?: string) => {
