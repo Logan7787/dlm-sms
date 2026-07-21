@@ -56,6 +56,8 @@ interface StudioContextType {
   updateSupplier: (id: string, supplierData: Partial<Supplier>) => void;
   deleteSupplier: (id: string) => void;
   addCustomer: (customer: Omit<Customer, 'id' | 'created_at'>) => void;
+  updateCustomer: (id: string, customerData: Partial<Customer>) => void;
+  deleteCustomer: (id: string) => void;
   createInvoice: (
     invoiceData: { invoice_number: string; customer_id?: string | null; issued_at?: string; due_at?: string | null; tax_percent?: number; discount?: number; pdf_url?: string | null; created_by?: string | null },
     items: Array<{ item_id?: string; description: string; quantity: number; unit_price: number }>
@@ -201,6 +203,16 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     };
     setCustomers((prev) => [...prev, newCust]);
     logAction('INSERT', 'customers', newCust.id, { name: newCust.name });
+  };
+
+  const updateCustomer: StudioContextType['updateCustomer'] = (id, customerData) => {
+    setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...customerData } : c)));
+    logAction('UPDATE', 'customers', id, customerData);
+  };
+
+  const deleteCustomer: StudioContextType['deleteCustomer'] = (id) => {
+    setCustomers((prev) => prev.filter((c) => c.id !== id));
+    logAction('DELETE', 'customers', id, {});
   };
 
   const createInvoice: StudioContextType['createInvoice'] = (invoiceData, lineItemsData) => {
@@ -394,6 +406,8 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         updateSupplier,
         deleteSupplier,
         addCustomer,
+        updateCustomer,
+        deleteCustomer,
         createInvoice,
         finalizeInvoice,
         recordPayment,

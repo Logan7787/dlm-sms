@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Mail, Phone, Plus, Search, Users, MapPin, Receipt } from 'lucide-react';
+import { Mail, Phone, Plus, Search, Users, MapPin, Edit3, Trash2, AlertTriangle, X } from 'lucide-react';
 import { useStudio } from '@/context/studio-context';
+import { Customer } from '@/types/database';
 
 export default function CustomersPage() {
-  const { customers, addCustomer, invoices, settings } = useStudio();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, invoices, settings } = useStudio();
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -19,22 +22,57 @@ export default function CustomersPage() {
     (c.email && c.email.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const handleAddCustomer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name) return;
-
-    addCustomer({
-      name,
-      phone: phone || null,
-      email: email || null,
-      address: address || null,
-    });
-
-    setShowModal(false);
+  const handleOpenAdd = () => {
+    setEditingCustomer(null);
     setName('');
     setPhone('');
     setEmail('');
     setAddress('');
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (cust: Customer) => {
+    setEditingCustomer(cust);
+    setName(cust.name);
+    setPhone(cust.phone || '');
+    setEmail(cust.email || '');
+    setAddress(cust.address || '');
+    setShowModal(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    if (editingCustomer) {
+      updateCustomer(editingCustomer.id, {
+        name: name.trim(),
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+      });
+    } else {
+      addCustomer({
+        name: name.trim(),
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+      });
+    }
+
+    setShowModal(false);
+    setEditingCustomer(null);
+    setName('');
+    setPhone('');
+    setEmail('');
+    setAddress('');
+  };
+
+  const handleConfirmDelete = () => {
+    if (deletingCustomer) {
+      deleteCustomer(deletingCustomer.id);
+      setDeletingCustomer(null);
+    }
   };
 
   return (
@@ -52,7 +90,7 @@ export default function CustomersPage() {
         </div>
 
         <button
-          onClick={() => setShowModal(true)}
+          onClick={handleOpenAdd}
           className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all self-start md:self-auto"
         >
           <Plus className="h-4 w-4" />
@@ -87,8 +125,26 @@ export default function CustomersPage() {
                   <h3 className="text-base font-bold text-white group-hover:text-purple-300 transition-colors">{cust.name}</h3>
                   <p className="text-xs text-purple-300 font-semibold mt-0.5">{clientInvoices.length} Invoices Issued</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-800 text-purple-400">
-                  <Users className="h-5 w-5" />
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(cust)}
+                    className="p-2 rounded-xl bg-slate-900/90 hover:bg-purple-600/20 text-slate-400 hover:text-purple-300 border border-slate-800 transition-all"
+                    title="Edit client details"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeletingCustomer(cust)}
+                    className="p-2 rounded-xl bg-slate-900/90 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 border border-slate-800 transition-all"
+                    title="Delete client"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                  <div className="p-2.5 rounded-xl bg-slate-800 text-purple-400 ml-1">
+                    <Users className="h-5 w-5" />
+                  </div>
                 </div>
               </div>
 
@@ -122,16 +178,24 @@ export default function CustomersPage() {
         })}
       </div>
 
-      {/* Modal */}
+      {/* Add / Edit Client Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="glass-card w-full max-w-md rounded-2xl border border-slate-800 p-6 space-y-5 shadow-2xl">
-            <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
-              <Users className="h-5 w-5 text-indigo-400" />
-              <span>Register New Studio Client</span>
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+                <Users className="h-5 w-5 text-indigo-400" />
+                <span>{editingCustomer ? 'Edit Client Details' : 'Register New Studio Client'}</span>
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-            <form onSubmit={handleAddCustomer} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Client / Agency Name *</label>
                 <input
@@ -180,18 +244,52 @@ export default function CustomersPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-xs"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-xs shadow-lg shadow-indigo-500/20 transition-all"
                 >
-                  Save Client
+                  {editingCustomer ? 'Update Client' : 'Save Client'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingCustomer && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-sm rounded-2xl border border-slate-800 p-6 space-y-5 shadow-2xl text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Delete Client Profile?</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Are you sure you want to delete <span className="text-slate-200 font-semibold">{deletingCustomer.name}</span>? This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingCustomer(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-lg shadow-rose-600/20 transition-all"
+              >
+                Yes, Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
