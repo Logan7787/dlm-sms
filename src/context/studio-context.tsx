@@ -53,6 +53,8 @@ interface StudioContextType {
   addStockMovement: (movementData: { item_id: string; movement_type: StockMovement['movement_type']; quantity: number; note?: string; reference_invoice_id?: string }) => void;
   addCategory: (name: string, description?: string) => void;
   addSupplier: (supplier: Omit<Supplier, 'id' | 'created_at'>) => void;
+  updateSupplier: (id: string, supplierData: Partial<Supplier>) => void;
+  deleteSupplier: (id: string) => void;
   addCustomer: (customer: Omit<Customer, 'id' | 'created_at'>) => void;
   createInvoice: (
     invoiceData: { invoice_number: string; customer_id?: string | null; issued_at?: string; due_at?: string | null; tax_percent?: number; discount?: number; pdf_url?: string | null; created_by?: string | null },
@@ -179,6 +181,16 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     };
     setSuppliers((prev) => [...prev, newSup]);
     logAction('INSERT', 'suppliers', newSup.id, { name: newSup.name });
+  };
+
+  const updateSupplier: StudioContextType['updateSupplier'] = (id, supplierData) => {
+    setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...supplierData } : s)));
+    logAction('UPDATE', 'suppliers', id, supplierData);
+  };
+
+  const deleteSupplier: StudioContextType['deleteSupplier'] = (id) => {
+    setSuppliers((prev) => prev.filter((s) => s.id !== id));
+    logAction('DELETE', 'suppliers', id, {});
   };
 
   const addCustomer: StudioContextType['addCustomer'] = (customerData) => {
@@ -379,6 +391,8 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         addStockMovement,
         addCategory,
         addSupplier,
+        updateSupplier,
+        deleteSupplier,
         addCustomer,
         createInvoice,
         finalizeInvoice,
