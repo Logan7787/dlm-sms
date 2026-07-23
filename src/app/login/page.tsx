@@ -65,9 +65,9 @@ export default function LoginPage() {
         <div className="w-full max-w-md z-10 animate-logo-in">
           {/* Brand Header */}
           <div className="text-center mb-8">
-            <div className="relative mx-auto h-20 w-20 rounded-2xl bg-slate-900/90 border border-slate-700/60 p-2 shadow-xl shadow-indigo-500/15 flex items-center justify-center mb-4 group transition-transform duration-300 hover:scale-105">
+            <div className="relative mx-auto h-20 w-20 rounded-2xl bg-[#0f172a] border border-slate-800 p-2 shadow-xl shadow-indigo-500/15 flex items-center justify-center mb-4 group transition-transform duration-300 hover:scale-105">
               <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-40 blur-md group-hover:opacity-70 transition-opacity" />
-              <div className="relative w-full h-full rounded-xl overflow-hidden flex items-center justify-center bg-slate-950">
+              <div className="relative w-full h-full rounded-xl overflow-hidden flex items-center justify-center bg-[#020617]">
                 <Image
                   src="/logo.png"
                   alt="Daylight Media Logo"
