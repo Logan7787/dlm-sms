@@ -63,7 +63,7 @@ interface StudioContextType {
   addItem: (itemData: Omit<Item, 'id' | 'created_at'>, initialQuantity?: number) => void;
   updateItem: (id: string, itemData: Partial<Item>) => void;
   addStockMovement: (movementData: { item_id: string; movement_type: StockMovement['movement_type']; quantity: number; note?: string; reference_invoice_id?: string }) => void;
-  addCategory: (name: string, description?: string) => void;
+  addCategory: (name: string, description?: string) => Category;
   addSupplier: (supplier: Omit<Supplier, 'id' | 'created_at'>) => void;
   updateSupplier: (id: string, supplierData: Partial<Supplier>) => void;
   deleteSupplier: (id: string) => void;
@@ -81,6 +81,8 @@ interface StudioContextType {
   createUserProfile: (userData: { full_name: string; email: string; password?: string; role: UserRole }) => Profile;
   deleteUserProfile: (userId: string) => void;
   loginUser: (email: string, password?: string) => Profile | null;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -101,6 +103,25 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>(INITIAL_PAYMENTS);
   const [settings, setSettings] = useState<StudioSettings>(INITIAL_SETTINGS);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(INITIAL_ACTIVITY_LOGS);
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('studio-theme') as 'light' | 'dark';
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('studio-theme', theme);
+  }, [theme]);
 
   // Sync initial data from Supabase Database if populated
   useEffect(() => {
@@ -253,6 +274,8 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     (supabase as any).from('categories').insert([newCat]).then(({ error }: any) => {
       if (error) console.error('Supabase category insert error:', error);
     });
+
+    return newCat;
   };
 
   const addSupplier: StudioContextType['addSupplier'] = (supplierData) => {
@@ -587,6 +610,8 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         createUserProfile,
         deleteUserProfile,
         loginUser,
+        theme,
+        setTheme,
       }}
     >
       {children}

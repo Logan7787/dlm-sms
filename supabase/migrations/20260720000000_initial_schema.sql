@@ -425,17 +425,17 @@ for each row execute function public.log_activity();
 -- ROW LEVEL SECURITY (RLS) POLICIES
 --------------------------------------------------------------------------------
 
-alter table public.profiles enable row level security;
-alter table public.categories enable row level security;
-alter table public.suppliers enable row level security;
-alter table public.items enable row level security;
-alter table public.stock_movements enable row level security;
-alter table public.customers enable row level security;
-alter table public.invoices enable row level security;
-alter table public.invoice_items enable row level security;
-alter table public.payments enable row level security;
-alter table public.activity_log enable row level security;
-alter table public.studio_settings enable row level security;
+alter table public.profiles disable row level security;
+alter table public.categories disable row level security;
+alter table public.suppliers disable row level security;
+alter table public.items disable row level security;
+alter table public.stock_movements disable row level security;
+alter table public.customers disable row level security;
+alter table public.invoices disable row level security;
+alter table public.invoice_items disable row level security;
+alter table public.payments disable row level security;
+alter table public.activity_log disable row level security;
+alter table public.studio_settings disable row level security;
 
 -- Helper function to fetch current user's role
 create or replace function public.current_user_role()

@@ -2,12 +2,12 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Plus, Shield, User, Sparkles, LogOut } from 'lucide-react';
+import { Plus, Shield, User, Sparkles, LogOut, Sun, Moon } from 'lucide-react';
 import { useStudio } from '@/context/studio-context';
 import { UserRole } from '@/types/database';
 
 export function Header() {
-  const { userRole, setUserRole, currentUser } = useStudio();
+  const { userRole, setUserRole, currentUser, theme, setTheme } = useStudio();
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setUserRole(e.target.value as UserRole);
@@ -70,6 +70,19 @@ export function Header() {
             <option value="staff" className="bg-slate-900 text-emerald-300">Staff (Read & Drafts)</option>
           </select>
         </div>
+
+        {/* Theme Switcher */}
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all duration-200"
+          title={theme === 'dark' ? 'Switch to Day Theme' : 'Switch to Night Theme'}
+        >
+          {theme === 'dark' ? (
+            <Sun className="h-4 w-4 text-amber-400" />
+          ) : (
+            <Moon className="h-4 w-4 text-indigo-400" />
+          )}
+        </button>
 
         {/* User Profile Info */}
         <div className="flex items-center gap-3 pl-2">

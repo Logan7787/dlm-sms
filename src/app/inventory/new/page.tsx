@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Package, Plus, Save } from 'lucide-react';
+import { ArrowLeft, Package, Plus, Save, X } from 'lucide-react';
 import { useStudio } from '@/context/studio-context';
 
 export default function NewInventoryItemPage() {
   const router = useRouter();
-  const { categories, suppliers, addItem } = useStudio();
+  const { categories, suppliers, addItem, addCategory } = useStudio();
 
   const [sku, setSku] = useState(`MAT-${Math.floor(1000 + Math.random() * 9000)}`);
   const [name, setName] = useState('');
@@ -20,6 +20,30 @@ export default function NewInventoryItemPage() {
   const [reorderLevel, setReorderLevel] = useState<number>(5);
   const [initialStock, setInitialStock] = useState<number>(10);
   const [photoUrl, setPhotoUrl] = useState('');
+
+  // Add Category Modal State
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDescription, setNewCategoryDescription] = useState('');
+
+  // Sync categoryId if categories finish loading after initial render
+  useEffect(() => {
+    if (!categoryId && categories.length > 0) {
+      setCategoryId(categories[0].id);
+    }
+  }, [categories, categoryId]);
+
+  const handleCreateCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    const newCat = addCategory(newCategoryName.trim(), newCategoryDescription.trim());
+    if (newCat) {
+      setCategoryId(newCat.id);
+    }
+    setNewCategoryName('');
+    setNewCategoryDescription('');
+    setShowAddCategoryModal(false);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,9 +122,19 @@ export default function NewInventoryItemPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              Category
-            </label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Category
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowAddCategoryModal(true)}
+                className="flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-350 hover:underline transition-all"
+              >
+                <Plus className="h-3 w-3" />
+                <span>New Category</span>
+              </button>
+            </div>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
@@ -224,6 +258,69 @@ export default function NewInventoryItemPage() {
           </button>
         </div>
       </form>
+
+      {/* Add Category Modal */}
+      {showAddCategoryModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-md rounded-2xl border border-slate-800 p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+                <Plus className="h-5 w-5 text-indigo-400" />
+                <span>Create New Category</span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowAddCategoryModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Category Name *</label>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="e.g. Cameras, Lenses, Lighting..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase mb-2">Description</label>
+                <textarea
+                  value={newCategoryDescription}
+                  onChange={(e) => setNewCategoryDescription(e.target.value)}
+                  placeholder="e.g. Cinema lenses, prime lenses, zooms..."
+                  rows={3}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCategoryModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save Category</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
